@@ -1286,14 +1286,53 @@ void TH2Poly::SavePrimitive(std::ostream &out, Option_t *option)
 ////////////////////////////////////////////////////////////////////////////////
 /// Multiply this histogram by a constant c1.
 
-void TH2Poly::Scale(Double_t c1, Option_t*)
+void TH2Poly::Scale(Double_t c1, Option_t* option)
 {
-   for( int i = 0; i < this->GetNumberOfBins(); i++ ) {
-      this->SetBinContent(i+1, c1*this->GetBinContent(i+1));
+   Bool_t normaliseWidth = kFALSE;
+   TString opt = option; opt.ToLower();
+   
+   // store bin errors when scaling since cannot anymore be computed as sqrt(N)
+   if (!opt.Contains("nosw2") && GetSumw2N() == 0) Sumw2();
+
+   if (opt.Contains("width") || opt.Contains("area")) {
+     normaliseWidth = kTRUE;
    }
-   for( int i = 0; i < kNOverflow; i++ ) {
-      this->SetBinContent(-i-1, c1*this->GetBinContent(-i-1) );
+   else {
+
+      for (int bin = -kNOverflow; bin <= GetNumberOfBins(); bin++) {
+         SetBinContent(bin, c1 * GetBinContent(bin));
+
+         if (fSumw2.fN) {
+            int idx = bin+kNOverflow;
+            if (bin==0) continue;
+            if (bin>0) idx -= 1;
+            fSumw2.fArray[idx] *= (c1 * c1); // update errors
+         }
+      }
    }
+
+   if (normaliseWidth) {
+
+      for (int bin = -kNOverflow; bin <= GetNumberOfBins(); bin++) {
+         Double_t w = GetBinWidth(bin);
+         SetBinContent(bin, c1 * GetBinContent(bin) / w);
+
+         if (fSumw2.fN) {
+            Double_t e1 = GetBinError(bin) / w;
+            int idx = bin+kNOverflow;
+            if (bin==0) continue;
+            if (bin>0) idx -= 1;
+            fSumw2.fArray[idx] = c1 * c1 * e1 * e1;
+         }
+
+      }
+   }
+   // for( int i = 0; i < this->GetNumberOfBins(); i++ ) {
+   //    this->SetBinContent(i+1, c1*this->GetBinContent(i+1));
+   // }
+   // for( int i = 0; i < kNOverflow; i++ ) {
+   //    this->SetBinContent(-i-1, c1*this->GetBinContent(-i-1) );
+   // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
